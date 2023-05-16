@@ -549,6 +549,10 @@ pub const DateTime = struct {
         };
     }
 
+    pub fn now() DateTime {
+        return fromUnixNanoseconds(std.time.nanoTimestamp());
+    }
+
     pub fn fromUnixSeconds(seconds: i128) DateTime {
         return unix_epoch.add(.seconds, seconds);
     }
