@@ -401,7 +401,7 @@ pub const Date = struct {
     }
 
     pub fn parse(buf: []const u8) !Date {
-        const parser = try DateTimeParser.init(.date, buf);
+        const parser = try DateTimeParser.parse(.date, buf);
         return parseImpl(parser);
     }
 
@@ -847,7 +847,7 @@ pub const UtcOffset = struct {
             .positive => '+',
             .negative => '-',
         });
-        try writer.print("{d:0>2}{d:0>2}", .{
+        try writer.print("{d:0>2}:{d:0>2}", .{
             utc_offset.hours,
             utc_offset.minutes,
         });
@@ -1191,7 +1191,7 @@ const DateTimeParser = struct {
         if (parser.peekByte()) |next_byte| {
             switch (next_byte) {
                 'Z', '+', '-' => return false,
-                '.' => parser.index += 1,
+                '.', ',' => parser.index += 1,
                 else => return error.InvalidCharacter,
             }
         } else return false;
@@ -1722,12 +1722,57 @@ test "Date/time parsing" {
         Time.init(21, 20, 43, 123 * std.time.ns_per_ms),
         TimeZone.init(.negative, 4, 0),
     );
+
     try expectEqual(date_time_1, try DateTime.parse("2023-05-15T21:20:43.123-04:00"));
-    try expectEqual(date_time_1, try DateTime.parse("20230515T212043.123-0400"));
+    try expectEqual(date_time_1, try DateTime.parse("2023-05-15T21:20:43,123-04:00"));
     try expectEqual(date_time_1, try DateTime.parse("2023-W20-1T21:20:43.123-04:00"));
-    try expectEqual(date_time_1, try DateTime.parse("2023W201T212043.123-0400"));
+    try expectEqual(date_time_1, try DateTime.parse("2023-W20-1T21:20:43,123-04:00"));
     try expectEqual(date_time_1, try DateTime.parse("2023-135T21:20:43.123-04:00"));
+    try expectEqual(date_time_1, try DateTime.parse("2023-135T21:20:43,123-04:00"));
+
+    try expectEqual(date_time_1, try DateTime.parse("20230515T212043.123-0400"));
+    try expectEqual(date_time_1, try DateTime.parse("20230515T212043,123-0400"));
+    try expectEqual(date_time_1, try DateTime.parse("2023W201T212043.123-0400"));
+    try expectEqual(date_time_1, try DateTime.parse("2023W201T212043,123-0400"));
     try expectEqual(date_time_1, try DateTime.parse("2023135T212043.123-0400"));
+    try expectEqual(date_time_1, try DateTime.parse("2023135T212043,123-0400"));
+
+    try expectEqual(date_time_1, try DateTime.parse("+2023-05-15T21:20:43.123-04:00"));
+    try expectEqual(date_time_1, try DateTime.parse("+2023-05-15T21:20:43,123-04:00"));
+    try expectEqual(date_time_1, try DateTime.parse("+2023-W20-1T21:20:43.123-04:00"));
+    try expectEqual(date_time_1, try DateTime.parse("+2023-W20-1T21:20:43,123-04:00"));
+    try expectEqual(date_time_1, try DateTime.parse("+2023-135T21:20:43.123-04:00"));
+    try expectEqual(date_time_1, try DateTime.parse("+2023-135T21:20:43,123-04:00"));
+
+    try expectEqual(date_time_1, try DateTime.parse("+02023-05-15T21:20:43.123-04:00"));
+    try expectEqual(date_time_1, try DateTime.parse("+02023-05-15T21:20:43,123-04:00"));
+    try expectEqual(date_time_1, try DateTime.parse("+02023-W20-1T21:20:43.123-04:00"));
+    try expectEqual(date_time_1, try DateTime.parse("+02023-W20-1T21:20:43,123-04:00"));
+    try expectEqual(date_time_1, try DateTime.parse("+02023-135T21:20:43.123-04:00"));
+    try expectEqual(date_time_1, try DateTime.parse("+02023-135T21:20:43,123-04:00"));
+
+    const date_time_2 = DateTime.init(
+        try Date.init(99_999, 6, 21),
+        Time.init(15, 42, 6, 0),
+        .utc,
+    );
+
+    try expectEqual(date_time_2, try DateTime.parse("+99999-06-21T15:42:06Z"));
+    try expectEqual(date_time_2, try DateTime.parse("+099999-06-21T15:42:06Z"));
+
+    const date_time_3 = DateTime.init(
+        try Date.init(-99_999, 6, 21),
+        Time.init(15, 42, 6, 0),
+        .utc,
+    );
+    try expectEqual(date_time_3, try DateTime.parse("-99999-06-21T15:42:06Z"));
+    try expectEqual(date_time_3, try DateTime.parse("-099999-06-21T15:42:06Z"));
+
+    try expectError(error.ConflictingFormat, DateTime.parse("20230515T21:20:43Z"));
+    try expectError(error.ConflictingFormat, DateTime.parse("2023-05-15T212043Z"));
+    try expectError(error.ConflictingFormat, Date.parse("+2023W201"));
+    try expectError(error.InvalidCharacter, DateTime.parse("+999990515T"));
+    try expectError(error.InvalidCharacter, Date.parse("202-05-15"));
 }
 
 test "Week dates" {
