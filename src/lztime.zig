@@ -26,7 +26,7 @@ pub const Weekday = enum {
     sunday,
 
     pub inline fn add(weekday: Weekday, days: anytype) Weekday {
-        return @intToEnum(Weekday, @mod(@enumToInt(weekday) + @intCast(i8, @rem(days, 7)), 7));
+        return @enumFromInt(Weekday, @mod(@intFromEnum(weekday) + @intCast(i8, @rem(days, 7)), 7));
     }
 };
 
@@ -51,7 +51,7 @@ pub const WeekDate = struct {
         try writer.print("{d:0>4}-W{d:0>2}-{d}", .{
             std.math.absCast(week_date.year),
             week_date.week,
-            @as(u8, @enumToInt(week_date.day)) + 1,
+            @as(u8, @intFromEnum(week_date.day)) + 1,
         });
     }
 };
@@ -107,7 +107,7 @@ pub const Date = struct {
             return result;
         }
 
-        const january_to_march = @as(u9, 31 + 28) + @boolToInt(result.isLeapYear());
+        const january_to_march = @as(u9, 31 + 28) + @intFromBool(result.isLeapYear());
         if (day < january_to_march) {
             result.month = 2;
             result.day = @intCast(u5, day - 31 + 1);
@@ -175,7 +175,7 @@ pub const Date = struct {
         if (week > weeks_in_year) return error.Overflow; // Year does not have this many weeks.
 
         const jan1_index = initUnchecked(year, 1, 1).dayIndex();
-        const jan1_weekday = @intToEnum(Weekday, @mod(jan1_index - 2, 7));
+        const jan1_weekday = @enumFromInt(Weekday, @mod(jan1_index - 2, 7));
         const this_week_01 = switch (jan1_weekday) {
             .monday => jan1_index,
             .tuesday => jan1_index - 1,
@@ -186,7 +186,7 @@ pub const Date = struct {
             .sunday => jan1_index + 1,
         };
 
-        const day_offset = @as(u9, week - 1) * 7 + @enumToInt(weekday);
+        const day_offset = @as(u9, week - 1) * 7 + @intFromEnum(weekday);
         return fromDayIndex(this_week_01 + day_offset);
     }
 
@@ -263,7 +263,7 @@ pub const Date = struct {
     pub fn daysInMonth(date: Date) u5 {
         return switch (date.month) {
             1 => 31, // January
-            2 => @as(u5, 28) + @boolToInt(date.isLeapYear()), // February
+            2 => @as(u5, 28) + @intFromBool(date.isLeapYear()), // February
             3 => 31, // March
             4 => 30, // April
             5 => 31, // May
@@ -280,13 +280,13 @@ pub const Date = struct {
 
     /// The number of days in the current year.
     pub fn daysInYear(date: Date) u9 {
-        return @as(u9, 365) + @boolToInt(date.isLeapYear());
+        return @as(u9, 365) + @intFromBool(date.isLeapYear());
     }
 
     /// 0-indexed day of year (January 1st is day 0, February 1st is day 31).
     pub fn dayOfYear(date: Date) u9 {
         const day_of_month: u9 = date.day - 1;
-        const january_to_march = @as(u9, 31 + 28) + @boolToInt(date.isLeapYear());
+        const january_to_march = @as(u9, 31 + 28) + @intFromBool(date.isLeapYear());
         return switch (date.month) {
             1 => day_of_month,
             2 => day_of_month + 31,
@@ -333,7 +333,7 @@ pub const Date = struct {
     pub fn weekDate(date: Date) WeekDate {
         const jan1 = initUnchecked(date.year, 1, 1);
         const jan1_index = jan1.dayIndex();
-        const jan1_weekday = @intToEnum(Weekday, @mod(jan1_index - 2, 7));
+        const jan1_weekday = @enumFromInt(Weekday, @mod(jan1_index - 2, 7));
         const this_week_01 = switch (jan1_weekday) {
             .monday => jan1_index,
             .tuesday => jan1_index - 1,
@@ -345,7 +345,7 @@ pub const Date = struct {
         };
 
         const day_index = jan1_index + date.dayOfYear();
-        const weekday = @intToEnum(Weekday, @mod(day_index - 2, 7));
+        const weekday = @enumFromInt(Weekday, @mod(day_index - 2, 7));
         if (day_index < this_week_01) {
             const last_dec28 = initUnchecked(date.year -| 1, 12, 28);
             const last_dec28_week_date = last_dec28.weekDate();
@@ -358,8 +358,8 @@ pub const Date = struct {
 
         const dec28 = initUnchecked(date.year, 12, 28);
         const dec28_index = jan1_index + dec28.dayOfYear();
-        const dec28_weekday = @intToEnum(Weekday, @mod(dec28_index - 2, 7));
-        const next_week_01 = dec28_index + 7 - @enumToInt(dec28_weekday);
+        const dec28_weekday = @enumFromInt(Weekday, @mod(dec28_index - 2, 7));
+        const next_week_01 = dec28_index + 7 - @intFromEnum(dec28_weekday);
 
         if (day_index >= next_week_01) {
             return .{
@@ -377,7 +377,7 @@ pub const Date = struct {
     }
 
     pub fn dayOfWeek(date: Date) Weekday {
-        return @intToEnum(Weekday, @mod(date.dayIndex() - 2, 7));
+        return @enumFromInt(Weekday, @mod(date.dayIndex() - 2, 7));
     }
 
     pub fn format(
@@ -436,7 +436,7 @@ pub const Date = struct {
 
                 if (day < 1 or day > 7) return error.Overflow;
 
-                return Date.fromWeekDate(year, week, @intToEnum(Weekday, day - 1));
+                return Date.fromWeekDate(year, week, @enumFromInt(Weekday, day - 1));
             },
         }
     }
@@ -863,7 +863,7 @@ pub const UtcOffset = struct {
 
         const hour_digit_index: usize = 1;
         const colon_separator_index: usize = 3;
-        const minute_digit_index = colon_separator_index + @boolToInt(expect_colon_separator);
+        const minute_digit_index = colon_separator_index + @intFromBool(expect_colon_separator);
 
         const sign: Sign = switch (tz_spec[0]) {
             '+' => .positive,
@@ -1015,7 +1015,7 @@ const DateTimeParser = struct {
                 else => return error.InvalidCharacter,
             }
         }
-        parser.year = .{ start, start + @boolToInt(has_sign) + num_digits };
+        parser.year = .{ start, start + @intFromBool(has_sign) + num_digits };
     }
 
     fn parseWeekDate(parser: *DateTimeParser) !void {
