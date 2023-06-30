@@ -26,7 +26,9 @@ pub const Weekday = enum {
     sunday,
 
     pub inline fn add(weekday: Weekday, days: anytype) Weekday {
-        return @enumFromInt(Weekday, @mod(@intFromEnum(weekday) + @intCast(i8, @rem(days, 7)), 7));
+        const offset: i8 = @intCast(@rem(days, 7));
+        const sum = @intFromEnum(weekday) + offset;
+        return @enumFromInt(@mod(sum, 7));
     }
 };
 
@@ -103,14 +105,14 @@ pub const Date = struct {
             .day = 1,
         };
         if (day < 31) {
-            result.day = @intCast(u5, day + 1);
+            result.day = @intCast(day + 1);
             return result;
         }
 
         const january_to_march = @as(u9, 31 + 28) + @intFromBool(result.isLeapYear());
         if (day < january_to_march) {
             result.month = 2;
-            result.day = @intCast(u5, day - 31 + 1);
+            result.day = @intCast(day - 31 + 1);
             return result;
         }
 
@@ -118,43 +120,43 @@ pub const Date = struct {
         switch (days_from_march_1st) {
             0...30 => {
                 result.month = 3;
-                result.day = @intCast(u5, days_from_march_1st + 1);
+                result.day = @intCast(days_from_march_1st + 1);
             },
             31...60 => {
                 result.month = 4;
-                result.day = @intCast(u5, days_from_march_1st - 31 + 1);
+                result.day = @intCast(days_from_march_1st - 31 + 1);
             },
             61...91 => {
                 result.month = 5;
-                result.day = @intCast(u5, days_from_march_1st - 61 + 1);
+                result.day = @intCast(days_from_march_1st - 61 + 1);
             },
             92...121 => {
                 result.month = 6;
-                result.day = @intCast(u5, days_from_march_1st - 92 + 1);
+                result.day = @intCast(days_from_march_1st - 92 + 1);
             },
             122...152 => {
                 result.month = 7;
-                result.day = @intCast(u5, days_from_march_1st - 122 + 1);
+                result.day = @intCast(days_from_march_1st - 122 + 1);
             },
             153...183 => {
                 result.month = 8;
-                result.day = @intCast(u5, days_from_march_1st - 153 + 1);
+                result.day = @intCast(days_from_march_1st - 153 + 1);
             },
             184...213 => {
                 result.month = 9;
-                result.day = @intCast(u5, days_from_march_1st - 184 + 1);
+                result.day = @intCast(days_from_march_1st - 184 + 1);
             },
             214...244 => {
                 result.month = 10;
-                result.day = @intCast(u5, days_from_march_1st - 214 + 1);
+                result.day = @intCast(days_from_march_1st - 214 + 1);
             },
             245...274 => {
                 result.month = 11;
-                result.day = @intCast(u5, days_from_march_1st - 245 + 1);
+                result.day = @intCast(days_from_march_1st - 245 + 1);
             },
             275...305 => {
                 result.month = 12;
-                result.day = @intCast(u5, days_from_march_1st - 275 + 1);
+                result.day = @intCast(days_from_march_1st - 275 + 1);
             },
             else => return error.Overflow, // Year does not have this many days.
         }
@@ -175,7 +177,7 @@ pub const Date = struct {
         if (week > weeks_in_year) return error.Overflow; // Year does not have this many weeks.
 
         const jan1_index = initUnchecked(year, 1, 1).dayIndex();
-        const jan1_weekday = @enumFromInt(Weekday, @mod(jan1_index - 2, 7));
+        const jan1_weekday: Weekday = @enumFromInt(@mod(jan1_index - 2, 7));
         const this_week_01 = switch (jan1_weekday) {
             .monday => jan1_index,
             .tuesday => jan1_index - 1,
@@ -195,7 +197,7 @@ pub const Date = struct {
     /// This is the inverse operation of `dayIndex()`. 
     pub fn fromDayIndex(day_index: i128) Date {
         const period_index = @divFloor(day_index, days_in_400_years);
-        const periodic_day_index = @intCast(u32, @mod(day_index, days_in_400_years));
+        const periodic_day_index: u32 = @intCast(@mod(day_index, days_in_400_years));
 
         var fake_day_index = periodic_day_index;
         if (periodic_day_index >= year_301_january_1st) {
@@ -212,19 +214,19 @@ pub const Date = struct {
 
         switch (four_year_day_index) {
             0...365 => {
-                day_of_year = @intCast(u9, four_year_day_index);
+                day_of_year = @intCast(four_year_day_index);
             },
             366...730 => {
                 periodic_year_index += 1;
-                day_of_year = @intCast(u9, four_year_day_index - 366);
+                day_of_year = @intCast(four_year_day_index - 366);
             },
             731...1095 => {
                 periodic_year_index += 2;
-                day_of_year = @intCast(u9, four_year_day_index - 731);
+                day_of_year = @intCast(four_year_day_index - 731);
             },
             1096...1460 => {
                 periodic_year_index += 3;
-                day_of_year = @intCast(u9, four_year_day_index - 1096);
+                day_of_year = @intCast(four_year_day_index - 1096);
             },
             else => unreachable, // All possible results for `x % 1461` are handled.
         }
@@ -307,7 +309,7 @@ pub const Date = struct {
     pub fn dayIndex(date: Date) i128 {
         const day_of_year: u32 = date.dayOfYear();
         const period_index = @divFloor(date.year, 400);
-        const periodic_year_index = @intCast(u32, @mod(date.year, 400));
+        const periodic_year_index: u32 = @intCast(@mod(date.year, 400));
 
         const four_year_day_index = switch (periodic_year_index % 4) {
             0 => day_of_year,
@@ -333,7 +335,7 @@ pub const Date = struct {
     pub fn weekDate(date: Date) WeekDate {
         const jan1 = initUnchecked(date.year, 1, 1);
         const jan1_index = jan1.dayIndex();
-        const jan1_weekday = @enumFromInt(Weekday, @mod(jan1_index - 2, 7));
+        const jan1_weekday: Weekday = @enumFromInt(@mod(jan1_index - 2, 7));
         const this_week_01 = switch (jan1_weekday) {
             .monday => jan1_index,
             .tuesday => jan1_index - 1,
@@ -345,7 +347,7 @@ pub const Date = struct {
         };
 
         const day_index = jan1_index + date.dayOfYear();
-        const weekday = @enumFromInt(Weekday, @mod(day_index - 2, 7));
+        const weekday: Weekday = @enumFromInt(@mod(day_index - 2, 7));
         if (day_index < this_week_01) {
             const last_dec28 = initUnchecked(date.year -| 1, 12, 28);
             const last_dec28_week_date = last_dec28.weekDate();
@@ -358,7 +360,7 @@ pub const Date = struct {
 
         const dec28 = initUnchecked(date.year, 12, 28);
         const dec28_index = jan1_index + dec28.dayOfYear();
-        const dec28_weekday = @enumFromInt(Weekday, @mod(dec28_index - 2, 7));
+        const dec28_weekday: Weekday = @enumFromInt(@mod(dec28_index - 2, 7));
         const next_week_01 = dec28_index + 7 - @intFromEnum(dec28_weekday);
 
         if (day_index >= next_week_01) {
@@ -369,15 +371,17 @@ pub const Date = struct {
             };
         }
 
+        const offset_from_week_01: u9 = @intCast(day_index - this_week_01);
+
         return .{
             .year = date.year,
-            .week = @intCast(u6, @intCast(u9, day_index - this_week_01) / 7 + 1),
+            .week = @intCast(offset_from_week_01 / 7 + 1),
             .day = weekday,
         };
     }
 
     pub fn dayOfWeek(date: Date) Weekday {
-        return @enumFromInt(Weekday, @mod(date.dayIndex() - 2, 7));
+        return @enumFromInt(@mod(date.dayIndex() - 2, 7));
     }
 
     pub fn format(
@@ -436,7 +440,7 @@ pub const Date = struct {
 
                 if (day < 1 or day > 7) return error.Overflow;
 
-                return Date.fromWeekDate(year, week, @enumFromInt(Weekday, day - 1));
+                return Date.fromWeekDate(year, week, @enumFromInt(day - 1));
             },
         }
     }
@@ -656,7 +660,7 @@ pub const DateTime = struct {
 
         switch (unit) {
             .years => {
-                date_time.year = @intCast(i64, std.math.clamp(
+                date_time.year = @intCast(std.math.clamp(
                     @as(i128, date_time.year) +| amount,
                     std.math.minInt(i64),
                     std.math.maxInt(i64),
@@ -664,7 +668,7 @@ pub const DateTime = struct {
                 date_time.day = @min(date_time.day, date_time.daysInMonth());
             },
             .months => {
-                const month_offset = @intCast(i8, @rem(amount, 12));
+                const month_offset: i8 = @intCast(@rem(amount, 12));
                 const year_offset = @divTrunc(amount, 12);
                 var new_month = @as(i8, date_time.month) + month_offset;
                 if (new_month < 1) {
@@ -675,7 +679,7 @@ pub const DateTime = struct {
                     new_month -= 12;
                 }
                 std.debug.assert(new_month >= 1 and new_month <= 12); // Sanity check.
-                date_time.month = @intCast(u4, new_month);
+                date_time.month = @intCast(new_month);
                 date_time.addToSelf(.years, year_offset);
                 date_time.day = @min(date_time.day, date_time.daysInMonth());
             },
@@ -689,17 +693,17 @@ pub const DateTime = struct {
             .hours => {
                 const new_hour = @as(i128, date_time.hour) +| amount;
                 date_time.addToSelf(.days, @divFloor(new_hour, 24));
-                date_time.hour = @intCast(u5, @mod(new_hour, 24));
+                date_time.hour = @intCast(@mod(new_hour, 24));
             },
             .minutes => {
                 const new_minute = @as(i128, date_time.minute) +| amount;
                 date_time.addToSelf(.hours, @divFloor(new_minute, 60));
-                date_time.minute = @intCast(u6, @mod(new_minute, 60));
+                date_time.minute = @intCast(@mod(new_minute, 60));
             },
             .seconds => {
                 const new_second = @as(i128, @min(date_time.second, 59)) +| amount;
                 date_time.addToSelf(.minutes, @divFloor(new_second, 60));
-                date_time.second = @intCast(u6, @mod(new_second, 60));
+                date_time.second = @intCast(@mod(new_second, 60));
             },
             .milliseconds => {
                 date_time.addToSelf(.nanoseconds, amount *| std.time.ns_per_ms);
@@ -710,7 +714,7 @@ pub const DateTime = struct {
             .nanoseconds => {
                 const new_nanosecond = @as(i128, date_time.nanosecond) +| amount;
                 date_time.addToSelf(.seconds, @divFloor(new_nanosecond, std.time.ns_per_s));
-                date_time.nanosecond = @intCast(u30, @mod(new_nanosecond, std.time.ns_per_s));
+                date_time.nanosecond = @intCast(@mod(new_nanosecond, std.time.ns_per_s));
             },
         }
     }
@@ -874,12 +878,12 @@ pub const UtcOffset = struct {
         var hours: u5 = 0;
         var hours_out_of_range = false;
         switch (tz_spec[hour_digit_index]) {
-            '0'...'2' => |digit| hours += @intCast(u5, digit - '0') * 10,
+            '0'...'2' => |digit| hours += @intCast((digit - '0') * 10),
             '3'...'9' => hours_out_of_range = true,
             else => return error.InvalidCharacter, // Expected the first digit of the hour offset.
         }
         switch (tz_spec[hour_digit_index + 1]) {
-            '0'...'9' => |digit| hours += @intCast(u5, digit - '0'),
+            '0'...'9' => |digit| hours += @intCast(digit - '0'),
             else => return error.InvalidCharacter, // Expected the second digit of the hour offset.
         }
 
@@ -894,12 +898,12 @@ pub const UtcOffset = struct {
         var minutes_out_of_range = false;
         if (!hours_only) {
             switch (tz_spec[minute_digit_index]) {
-                '0'...'5' => |digit| minutes += @intCast(u6, digit - '0') * 10,
+                '0'...'5' => |digit| minutes += @intCast((digit - '0') * 10),
                 '6'...'9' => minutes_out_of_range = true,
                 else => return error.InvalidCharacter, // Expected the first digit of the minute offset.
             }
             switch (tz_spec[minute_digit_index + 1]) {
-                '0'...'9' => |digit| minutes += @intCast(u6, digit - '0'),
+                '0'...'9' => |digit| minutes += @intCast(digit - '0'),
                 else => return error.InvalidCharacter, // Expected the second digit of the minute offset.
             }
         }
@@ -1119,7 +1123,7 @@ const DateTimeParser = struct {
             }
         }
         if (parser.index < parser.buf.len) {
-            parser.time_zone = .{ parser.index, @intCast(u8, parser.buf.len) };
+            parser.time_zone = .{ parser.index, @intCast(parser.buf.len) };
             parser.index = parser.time_zone.?[1];
         }
     }
