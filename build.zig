@@ -1,27 +1,33 @@
 const std = @import("std");
 
-const Build = std.Build;
+pub fn build(b: *std.Build) !void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+    const test_filters = blk: {
+        const test_filter = b.option([]const u8, "test-filter", "Filter the tests to be executed");
+        var filter_iterator = std.mem.splitScalar(u8, test_filter orelse break :blk &.{}, ',');
+        var test_filters: std.ArrayListUnmanaged([]const u8) = .{};
+        defer test_filters.deinit(b.allocator);
+        while (filter_iterator.next()) |filter| {
+            try test_filters.append(b.allocator, filter);
+        }
+        break :blk try test_filters.toOwnedSlice(b.allocator);
+    };
 
-pub fn build(builder: *Build) void {
-    const target = builder.standardTargetOptions(.{});
-    const optimize = builder.standardOptimizeOption(.{});
-    const test_filter = builder.option([]const u8, "test-filter", "Filter the tests to be executed");
-
-    const lztime_module = builder.addModule("lztime", .{
-        .source_file = .{ .path = "src/lztime.zig" },
-    });
-
-    const test_artifact = builder.addTest(.{
-        .root_source_file = lztime_module.source_file,
+    const lztime_module = b.addModule("lztime", .{
+        .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
-        .filter = test_filter,
     });
 
-    const test_run_step = builder.addRunArtifact(test_artifact);
+    const lztime_unit_tests = b.addTest(.{
+        .root_module = lztime_module,
+        .filters = test_filters,
+    });
+    const run_lztime_unit_tests = b.addRunArtifact(lztime_unit_tests);
 
-    builder.top_level_steps.clearRetainingCapacity();
-    const test_step = builder.step("test", "Run library tests");
-    test_step.dependOn(&test_run_step.step);
-    builder.default_step = test_step;
+    b.top_level_steps.clearRetainingCapacity();
+    const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&run_lztime_unit_tests.step);
+    b.default_step = test_step;
 }

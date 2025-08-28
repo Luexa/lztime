@@ -39,19 +39,15 @@ pub const WeekDate = struct {
 
     pub fn format(
         week_date: WeekDate,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        writer: *std.Io.Writer,
     ) !void {
-        _ = fmt;
-        _ = options;
         if (week_date.year > 9999) {
             try writer.writeByte('+');
         } else if (week_date.year < 0) {
             try writer.writeByte('-');
         }
         try writer.print("{d:0>4}-W{d:0>2}-{d}", .{
-            std.math.absCast(week_date.year),
+            @abs(week_date.year),
             week_date.week,
             @as(u8, @intFromEnum(week_date.day)) + 1,
         });
@@ -375,7 +371,7 @@ pub const Date = struct {
 
         return .{
             .year = date.year,
-            .week = @intCast(offset_from_week_01 / 7 + 1),
+            .week = @intCast((offset_from_week_01 / 7) + 1),
             .day = weekday,
         };
     }
@@ -386,19 +382,15 @@ pub const Date = struct {
 
     pub fn format(
         date: Date,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        writer: *std.Io.Writer,
     ) !void {
-        _ = fmt;
-        _ = options;
         if (date.year > 9999) {
             try writer.writeByte('+');
         } else if (date.year < 0) {
             try writer.writeByte('-');
         }
         try writer.print("{d:0>4}-{d:0>2}-{d:0>2}", .{
-            std.math.absCast(date.year),
+            @abs(date.year),
             date.month,
             date.day,
         });
@@ -469,28 +461,43 @@ pub const Time = struct {
 
     pub fn format(
         time: Time,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        writer: *std.Io.Writer,
     ) !void {
-        _ = fmt;
-        try writer.print("{d:0>2}:{d:0>2}:{d:0>2}", .{
-            time.hour,
-            time.minute,
-            time.second,
-        });
-
-        if (time.nanosecond == 0 or (options.precision != null and options.precision.? == 0)) return;
-
-        var buf: [9]u8 = undefined;
-        _ = std.fmt.bufPrint(&buf, "{d:0>9}", .{ time.nanosecond }) catch return;
-
-        const precision = options.precision orelse (
-            std.mem.lastIndexOfAny(u8, &buf, "123456789").? + 1
-        );
-
-        try writer.print(".{s}", .{ buf[0..@min(precision, buf.len)] });
+        return time.fmtPrecision(null).format(writer);
     }
+
+    pub inline fn fmtPrecision(
+        time: *const Time,
+        precision: ?u4,
+    ) FmtPrecision {
+        return .{ .time = time, .precision = precision };
+    }
+
+    pub const FmtPrecision = struct {
+        time: *const Time,
+        precision: ?u4,
+
+        pub fn format(
+            fmt: FmtPrecision,
+            writer: *std.Io.Writer,
+        ) !void {
+            try writer.print("{d:0>2}:{d:0>2}:{d:0>2}", .{
+                fmt.time.hour,
+                fmt.time.minute,
+                fmt.time.second,
+            });
+
+            if (fmt.time.nanosecond == 0 or fmt.precision != null and fmt.precision.? == 0) return;
+
+            var buf: [9]u8 = undefined;
+            _ = std.fmt.bufPrint(&buf, "{d:0>9}", .{ fmt.time.nanosecond }) catch return;
+
+            const precision: usize = fmt.precision orelse
+                std.mem.lastIndexOfAny(u8, &buf, "123456789").? + 1;
+
+            try writer.print(".{s}", .{ buf[0..@min(precision, buf.len)] });
+        }
+    };
 
     pub fn parse(buf: []const u8) !Time {
         const parser = try DateTimeParser.parse(.time, buf);
@@ -745,15 +752,32 @@ pub const DateTime = struct {
 
     pub fn format(
         date_time: DateTime,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        writer: *std.Io.Writer,
     ) !void {
-        try date_time.date().format(fmt, options, writer);
-        try writer.writeByte('T');
-        try date_time.time().format(fmt, options, writer);
-        try date_time.time_zone.format(fmt, options, writer);
+        return date_time.fmtPrecision(null).format(writer);
     }
+
+    pub inline fn fmtPrecision(
+        date_time: *const DateTime,
+        precision: ?u4,
+    ) FmtPrecision {
+        return .{ .date_time = date_time, .precision = precision };
+    }
+
+    pub const FmtPrecision = struct {
+        date_time: *const DateTime,
+        precision: ?u4,
+
+        pub fn format(
+            fmt: FmtPrecision,
+            writer: *std.Io.Writer,
+        ) !void {
+            try fmt.date_time.date().format(writer);
+            try writer.writeByte('T');
+            try fmt.date_time.time().fmtPrecision(fmt.precision).format(writer);
+            try fmt.date_time.time_zone.format(writer);
+        }
+    };
 
     pub fn parse(buf: []const u8) !DateTime {
         const parser = try DateTimeParser.parse(.date_time, buf);
@@ -793,13 +817,11 @@ pub const TimeZone = union(enum) {
 
     pub fn format(
         time_zone: TimeZone,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        writer: *std.Io.Writer,
     ) !void {
         switch (time_zone) {
             .utc => try writer.writeByte('Z'),
-            .utc_offset => |utc_offset| try utc_offset.format(fmt, options, writer),
+            .utc_offset => |utc_offset| try utc_offset.format(writer),
         }
     }
 
@@ -841,12 +863,8 @@ pub const UtcOffset = struct {
 
     pub fn format(
         utc_offset: UtcOffset,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        writer: *std.Io.Writer,
     ) !void {
-        _ = fmt;
-        _ = options;
         try writer.writeByte(switch (utc_offset.sign) {
             .positive => '+',
             .negative => '-',
@@ -1115,12 +1133,18 @@ const DateTimeParser = struct {
     }
 
     fn parseTime(parser: *DateTimeParser) !void {
-        if (try parser.parseHour()) {
-            if (try parser.parseMinute()) {
-                if (try parser.parseSecond()) {
-                    try parser.parseFraction();
-                }
-            }
+        switch (try parser.parseHour()) {
+            .none => {},
+            .subdivision => switch (try parser.parseMinute()) {
+                .none => {},
+                .subdivision => switch (try parser.parseSecond()) {
+                    .none => {},
+                    .subdivision => unreachable,
+                    .fraction => try parser.parseFraction(),
+                },
+                .fraction => try parser.parseFraction(),
+            },
+            .fraction => try parser.parseFraction(),
         }
         if (parser.index < parser.buf.len) {
             parser.time_zone = .{ parser.index, @intCast(parser.buf.len) };
@@ -1128,7 +1152,7 @@ const DateTimeParser = struct {
         }
     }
 
-    fn parseHour(parser: *DateTimeParser) !bool {
+    fn parseHour(parser: *DateTimeParser) !TimeContinuation {
         parser.hour = .{ parser.index, parser.index + 2 };
 
         for (0..2) |_| {
@@ -1140,22 +1164,26 @@ const DateTimeParser = struct {
 
         if (parser.peekByte()) |next_byte| {
             switch (next_byte) {
-                'Z', '+', '-' => return false,
+                'Z', '+', '-' => return .none,
                 '0'...'9' => {
                     try parser.setFormat(.basic);
+                    return .subdivision;
                 },
                 ':' => {
                     try parser.setFormat(.extended);
                     parser.index += 1;
+                    return .subdivision;
+                },
+                '.', ',' => {
+                    parser.index += 1;
+                    return .fraction;
                 },
                 else => return error.InvalidCharacter,
             }
-        } else return false;
-
-        return true;
+        } else return .none;
     }
 
-    fn parseMinute(parser: *DateTimeParser) !bool {
+    fn parseMinute(parser: *DateTimeParser) !TimeContinuation {
         parser.minute = .{ parser.index, parser.index + 2 };
 
         for (0..2) |_| {
@@ -1167,22 +1195,26 @@ const DateTimeParser = struct {
 
         if (parser.peekByte()) |next_byte| {
             switch (next_byte) {
-                'Z', '+', '-' => return false,
+                'Z', '+', '-' => return .none,
                 '0'...'9' => {
                     try parser.setFormat(.basic);
+                    return .subdivision;
                 },
                 ':' => {
                     try parser.setFormat(.extended);
                     parser.index += 1;
+                    return .subdivision;
+                },
+                '.', ',' => {
+                    parser.index += 1;
+                    return .fraction;
                 },
                 else => return error.InvalidCharacter,
             }
-        } else return false;
-
-        return true;
+        } else return .none;
     }
 
-    fn parseSecond(parser: *DateTimeParser) !bool {
+    fn parseSecond(parser: *DateTimeParser) !TimeContinuation {
         parser.second = .{ parser.index, parser.index + 2 };
 
         for (0..2) |_| {
@@ -1194,13 +1226,14 @@ const DateTimeParser = struct {
 
         if (parser.peekByte()) |next_byte| {
             switch (next_byte) {
-                'Z', '+', '-' => return false,
-                '.', ',' => parser.index += 1,
+                'Z', '+', '-' => return .none,
+                '.', ',' => {
+                    parser.index += 1;
+                    return .fraction;
+                },
                 else => return error.InvalidCharacter,
             }
-        } else return false;
-
-        return true;
+        } else return .none;
     }
 
     fn parseFraction(parser: *DateTimeParser) !void {
@@ -1268,8 +1301,20 @@ const DateTimeParser = struct {
         date_time,
     };
 
+    const TimeContinuation = enum {
+        none,
+        subdivision,
+        fraction,
+    };
+
     const Span = struct { u8, u8 };
 };
+
+fn mulFixed(multiplicand: i128, multiplier: i128, multiplier_places: u8) !i128 {
+    _ = multiplier_places;
+    _ = multiplier;
+    _ = multiplicand;
+}
 
 /// The number of days in 400 years.
 const days_in_400_years = 400 * 365 + 100 - 3;
@@ -1644,6 +1689,7 @@ test "Weekday add" {
 test "Day of week" {
     try expectEqual(Weekday.monday, (try Date.init(1, 1, 1)).dayOfWeek());
     try expectEqual(Weekday.saturday, (try Date.init(0, 1, 1)).dayOfWeek());
+    try expectEqual(Weekday.wednesday, (try Date.init(0, 3, 1)).dayOfWeek());
     try expectEqual(Weekday.sunday, Date.fromDayIndex(1).dayOfWeek());
     try expectEqual(Weekday.tuesday, Date.fromDayIndex(367).dayOfWeek());
     try expectEqual(Weekday.friday, Date.fromDayIndex(-1).dayOfWeek());
@@ -1789,7 +1835,7 @@ test "Week dates" {
         },
         date_1.weekDate(),
     );
-    try expectFmt("2008-W52-7", "{}", .{ date_1.weekDate() });
+    try expectFmt("2008-W52-7", "{f}", .{ date_1.weekDate() });
 
     const date_2 = try Date.init(2008, 12, 29);
     try expectEqual(
@@ -1800,7 +1846,7 @@ test "Week dates" {
         },
         date_2.weekDate(),
     );
-    try expectFmt("2009-W01-1", "{}", .{ date_2.weekDate() });
+    try expectFmt("2009-W01-1", "{f}", .{ date_2.weekDate() });
 
     const date_3 = try Date.init(2010, 1, 3);
     try expectEqual(
@@ -1811,7 +1857,7 @@ test "Week dates" {
         },
         date_3.weekDate(),
     );
-    try expectFmt("2009-W53-7", "{}", .{ date_3.weekDate() });
+    try expectFmt("2009-W53-7", "{f}", .{ date_3.weekDate() });
 
     const date_4 = try Date.init(2010, 1, 4);
     try expectEqual(
@@ -1822,5 +1868,5 @@ test "Week dates" {
         },
         date_4.weekDate(),
     );
-    try expectFmt("2010-W01-1", "{}", .{ date_4.weekDate() });
+    try expectFmt("2010-W01-1", "{f}", .{ date_4.weekDate() });
 }

@@ -1,0 +1,7 @@
+.{
+    .name = .lztime,
+    .version = "0.0.1",
+    .minimum_zig_version = "0.15.0-dev.1438+242102f9d",
+    .paths = .{"src", "build.zig", "build.zig.zon", "LICENSE"},
+    .fingerprint = 0x3346d1b5b99969da,
+}
